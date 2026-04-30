@@ -46,13 +46,7 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: 'bevande', nome: 'Bevande' }
 ];
 
-// Default placeholder logo (elegant monogram MS) — replaced when user uploads
 const DEFAULT_LOGO = 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="100" cy="100" r="92" fill="none" stroke="#011d13" stroke-width="2"/><circle cx="100" cy="100" r="86" fill="none" stroke="#b3b18f" stroke-width="0.6"/><text x="100" y="118" text-anchor="middle" font-family="Georgia, serif" font-size="68" font-style="italic" fill="#011d13">MS</text><text x="100" y="148" text-anchor="middle" font-family="Georgia, serif" font-size="9" letter-spacing="3" fill="#b3b18f">MASSERIA</text></svg>`);
-
-const LOGO_COLORS = {
-  accent: '#011d13',
-  highlight: '#b3b18f'
-};
 
 const STORAGE_KEY = 'masseria_data_v1';
 const LOGO_STORAGE_KEY = 'masseria_logo_v1';
@@ -60,16 +54,13 @@ const LOGO_STORAGE_KEY = 'masseria_logo_v1';
 export default function App() {
   const [activeTab, setActiveTab] = useState<'quotation' | 'menu'>('quotation');
   
-  // Logo State
   const [logo, setLogo] = useState<string>(DEFAULT_LOGO);
   const [logoUrlInput, setLogoUrlInput] = useState<string>('');
   const [logoLoading, setLogoLoading] = useState<boolean>(false);
   
-  // Menu State
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   
-  // Quotation State
   const [quotation, setQuotation] = useState<QuotationData>({
     cliente: '',
     evento: '',
@@ -83,7 +74,6 @@ export default function App() {
     selezionati: new Set()
   });
 
-  // --- Persistence ---
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -109,7 +99,6 @@ export default function App() {
     }
   }, [categories, menuItems]);
 
-  // --- Logo loading from URL ---
   const handleLoadLogo = async () => {
     const url = logoUrlInput.trim();
     if (!url) {
@@ -143,7 +132,7 @@ export default function App() {
       };
       reader.readAsDataURL(blob);
     } catch (err) {
-      alert('Impossibile caricare il logo da questo URL. Possibili cause:\n\n• Il link non è diretto a un\'immagine\n• Il sito blocca l\'accesso da browser (CORS)\n• L\'URL non è raggiungibile\n\nProva con un link diretto a un\'immagine (es. immagine caricata su imgur, postimages, ecc.)');
+      alert('Impossibile caricare il logo da questo URL. Possibili cause:\n\n• Il link non è diretto a un\'immagine\n• Il sito blocca l\'accesso da browser (CORS)\n• L\'URL non è raggiungibile');
       setLogoLoading(false);
     }
   };
@@ -156,7 +145,6 @@ export default function App() {
     }
   };
 
-  // --- Handlers ---
   const addCategory = (nome: string) => {
     if (!nome.trim()) return;
     const id = 'cat_' + Math.random().toString(36).slice(2, 9);
@@ -165,7 +153,6 @@ export default function App() {
 
   const removeCategory = (id: string) => {
     if (window.confirm('Eliminare la categoria e tutti i piatti contenuti?')) {
-      // Remove items belonging to this category from selection
       const itemIdsToRemove = menuItems.filter(item => item.categoryId === id).map(item => item.id);
       const newSelezionati = new Set(quotation.selezionati);
       itemIdsToRemove.forEach(itemId => newSelezionati.delete(itemId));
@@ -207,7 +194,7 @@ export default function App() {
     setQuotation({ ...quotation, selezionati: newSelezionati });
   };
 
-  // --- PDF Generation: compact, single-page where possible ---
+  // --- PDF Generation: balanced layout, anchored bottom block ---
   const generatePDF = () => {
     if (quotation.selezionati.size === 0) {
       if (!window.confirm('Nessun piatto selezionato. Generare comunque il PDF?')) return;
@@ -218,295 +205,356 @@ export default function App() {
     const pageH = 297;
     const margin = 20;
 
-    // Color palette (RGB)
-    const C_DARK: [number, number, number] = [1, 29, 19];      // #011d13
-    const C_GOLD: [number, number, number] = [179, 177, 143]; // #b3b18f
-    const C_PAPER: [number, number, number] = [253, 251, 246]; // #fdfbf6
-    const C_INK: [number, number, number] = [38, 42, 36];      // #262a24
+    const C_DARK: [number, number, number] = [1, 29, 19];
+    const C_GOLD: [number, number, number] = [179, 177, 143];
+    const C_PAPER: [number, number, number] = [253, 251, 246];
+    const C_INK: [number, number, number] = [38, 42, 36];
     const C_MUTED: [number, number, number] = [120, 120, 110];
     const C_CREAM: [number, number, number] = [250, 247, 240];
 
     const drawOrnament = (cx: number, cy: number, w: number, color: [number, number, number]) => {
+      doc.setDrawColor(...color);
+      doc.setLineWidth(0.3);
+      doc.line(cx - w/2, cy, cx - 5, cy);
+      doc.line(cx + 5, cy, cx + w/2, cy);
       doc.setFillColor(...color);
-      // Triple diamond/dot ornament as seen in the sample
-      doc.circle(cx, cy, 0.5, 'F');
+      const r = 0.8;
+      doc.triangle(cx - r, cy, cx, cy - r, cx + r, cy, 'F');
+      doc.triangle(cx - r, cy, cx, cy + r, cx + r, cy, 'F');
       doc.circle(cx - 3.2, cy, 0.35, 'F');
       doc.circle(cx + 3.2, cy, 0.35, 'F');
     };
 
-    // ============================================
-    // PAGE BACKGROUND
-    // ============================================
+    // Background
     doc.setFillColor(...C_PAPER);
     doc.rect(0, 0, pageW, pageH, 'F');
 
-    // ============================================
-    // INSTITUTIONAL HEADER (Dark Green Band)
-    // ============================================
-    const headerH = 34; // Reduced height to match the sleek sample look
+    // Header band
+    const headerH = 32;
     doc.setFillColor(...C_DARK);
     doc.rect(0, 0, pageW, headerH, 'F');
-    
-    // Internal gold frame
     doc.setDrawColor(...C_GOLD);
     doc.setLineWidth(0.3);
-    doc.rect(6, 6, pageW - 12, headerH - 12, 'S');
+    doc.rect(6, 5, pageW - 12, headerH - 10, 'S');
 
-    // Logo Monogram (Centered in band)
+    // Logo left
     try {
-      const logoFmt = logo.startsWith('data:image/svg') ? 'SVG' : 'PNG';
-      doc.addImage(logo, logoFmt, (pageW - 18) / 2, 7, 18, 18);
+      const logoFmt = logo.startsWith('data:image/svg') ? 'SVG' 
+                    : logo.startsWith('data:image/png') ? 'PNG' 
+                    : 'JPEG';
+      doc.addImage(logo, logoFmt, 14, 8, 16, 16);
     } catch (e) {
       doc.setDrawColor(...C_GOLD);
-      doc.circle(pageW / 2, 16, 8, 'S');
+      doc.circle(22, 16, 7, 'S');
     }
 
-    // Brand Name (Centered in band)
+    // Brand right
     doc.setTextColor(...C_GOLD);
     doc.setFont('times', 'bold');
-    doc.setFontSize(22);
-    doc.text('MASSERIA SACRAMENTO', pageW / 2, 27, { align: 'center', charSpace: 1.8 });
-    
+    doc.setFontSize(20);
+    doc.text('MASSERIA SACRAMENTO', pageW - 14, 18, { align: 'right', charSpace: 1.5 });
     doc.setFont('times', 'italic');
     doc.setFontSize(8);
-    doc.text('agriturismo', pageW / 2, 31, { align: 'center', charSpace: 1.2 });
+    doc.setTextColor(...C_CREAM);
+    doc.text('agriturismo', pageW - 14, 24, { align: 'right', charSpace: 1.5 });
 
-    // ============================================
-    // CONTENT START
-    // ============================================
-    let y = headerH + 12;
-
-    // Proposta Evento Title
+    // Client band - centered
+    let y = headerH + 8;
     doc.setFont('times', 'italic');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(...C_GOLD);
     doc.text('— proposta evento —', pageW / 2, y, { align: 'center', charSpace: 1.5 });
-    y += 10;
+    y += 6;
 
-    // Cliente & Evento (Bold + Italic combined line)
     const clienteText = quotation.cliente || 'Gentile Cliente';
-    const eventoText = quotation.evento ? ` · ${quotation.evento}` : '';
+    const eventoText = quotation.evento ? `  ·  ${quotation.evento}` : '';
     
-    doc.setFont('times', 'bolditalic');
-    doc.setFontSize(22);
-    doc.setTextColor(...C_INK);
-    
-    // Rendering as a single centered block
-    const fullHeader = clienteText + eventoText;
-    doc.text(fullHeader, pageW / 2, y, { align: 'center' });
+    if (eventoText) {
+      doc.setFont('times', 'bolditalic');
+      doc.setFontSize(12);
+      const clienteW = doc.getTextWidth(clienteText);
+      doc.setFont('times', 'italic');
+      doc.setFontSize(10);
+      const eventoW = doc.getTextWidth(eventoText);
+      const totalW = clienteW + eventoW;
+      const startX = (pageW - totalW) / 2;
+      
+      doc.setFont('times', 'bolditalic');
+      doc.setFontSize(12);
+      doc.setTextColor(...C_INK);
+      doc.text(clienteText, startX, y + 4);
+      
+      doc.setFont('times', 'italic');
+      doc.setFontSize(10);
+      doc.setTextColor(...C_MUTED);
+      doc.text(eventoText, startX + clienteW, y + 4);
+    } else {
+      doc.setFont('times', 'bolditalic');
+      doc.setFontSize(12);
+      doc.setTextColor(...C_INK);
+      doc.text(clienteText, pageW / 2, y + 4, { align: 'center' });
+    }
     y += 8;
+    drawOrnament(pageW / 2, y + 4, 40, C_GOLD);
+    y += 9;
 
-    drawOrnament(pageW / 2, y, 50, C_GOLD);
-    y += 12;
-
-    // ============================================
-    // DETAILS GRID (Data, Ospiti, Prezzo)
-    // ============================================
-    const colW = (pageW - 2 * margin) / 3;
+    // Detail cards
+    const cardH = 14;
+    const cardW = (pageW - 2 * margin - 8) / 3;
     
-    // Horizontal gold hairlines for the grid
-    doc.setDrawColor(...C_GOLD);
-    doc.setLineWidth(0.2);
-    doc.line(margin, y, pageW - margin, y);
-    doc.line(margin, y + 16, pageW - margin, y + 16);
-
-    const drawDetail = (x: number, label: string, val: string) => {
+    const drawDetailCard = (x: number, label: string, value: string) => {
+      doc.setDrawColor(...C_GOLD);
+      doc.setLineWidth(0.25);
+      doc.line(x, y, x + cardW, y);
+      doc.line(x, y + cardH, x + cardW, y + cardH);
       doc.setFont('times', 'italic');
       doc.setFontSize(7);
       doc.setTextColor(...C_GOLD);
-      doc.text(label, x, y + 5, { align: 'center', charSpace: 1.2 });
+      doc.text(label.toUpperCase(), x + cardW / 2, y + 4, { align: 'center', charSpace: 1.5 });
       doc.setFont('times', 'normal');
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor(...C_INK);
-      doc.text(val, x, y + 11, { align: 'center' });
+      doc.text(value, x + cardW / 2, y + 11, { align: 'center' });
     };
 
-    const dataValue = quotation.data 
+    const dataFormatted = quotation.data 
       ? new Date(quotation.data).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
       : '—';
     
-    drawDetail(margin + colW / 2, 'DATA', dataValue);
-    drawDetail(pageW / 2, 'OSPITI', `${quotation.ospiti}`);
-    drawDetail(pageW - margin - colW / 2, 'PREZZO P.P.', 
+    drawDetailCard(margin, 'Data', dataFormatted);
+    drawDetailCard(margin + cardW + 4, 'Ospiti', `${quotation.ospiti}`);
+    drawDetailCard(margin + 2 * (cardW + 4), 'Prezzo p.p.', 
       quotation.prezzoPersona.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })
     );
+    y += cardH + 8;
 
-    y += 24;
+    // Bottom block precalc (badges + notes + total anchored to bottom)
+    const incl: string[] = [];
+    if (quotation.inclusoBevande) incl.push('Bevande incluse');
+    if (quotation.inclusoTorta) incl.push('Torta inclusa');
+    if (quotation.inclusoProsecco) incl.push('Prosecco incluso');
 
-    // ============================================
-    // PROPOSTA GASTRONOMICA
-    // ============================================
+    let noteLines: string[] = [];
+    if (quotation.note) {
+      doc.setFont('times', 'italic');
+      doc.setFontSize(9);
+      noteLines = doc.splitTextToSize(quotation.note, pageW - 2 * margin - 10);
+    }
+
+    const badgesH = incl.length > 0 ? 15 : 0;
+    const notesH = noteLines.length > 0 ? (10 + noteLines.length * 4) : 0;
+    const totalH = 30;
+    const footerReserveH = 18;
+    const bottomBlockH = badgesH + notesH + totalH;
+    const bottomBlockTop = pageH - footerReserveH - bottomBlockH;
+
+    // Menu intro
     doc.setFont('times', 'italic');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(...C_GOLD);
-    doc.text('PROPOSTA GASTRONOMICA', pageW / 2, y, { align: 'center', charSpace: 2.2 });
-    drawOrnament(pageW / 2, y + 3, 55, C_GOLD);
-    y += 10;
+    doc.text('PROPOSTA GASTRONOMICA', pageW / 2, y, { align: 'center', charSpace: 2.5 });
+    drawOrnament(pageW / 2, y + 3.5, 50, C_GOLD);
+    y += 8;
 
-    // Menu Item Collection
-    const menuToRender: { type: 'cat' | 'item' | 'desc', text: string }[] = [];
+    // Build render queue for auto-balancing
+    type RenderItem = { type: 'cat' | 'item' | 'desc'; text: string };
+    const renderQueue: RenderItem[] = [];
+    
     categories.forEach(cat => {
-      const items = menuItems.filter(i => i.categoryId === cat.id && quotation.selezionati.has(i.id));
-      if (items.length > 0) {
-        menuToRender.push({ type: 'cat', text: cat.nome });
-        items.forEach(it => {
-          menuToRender.push({ type: 'item', text: it.nome });
-          if (it.desc) menuToRender.push({ type: 'desc', text: it.desc });
-        });
+      const items = menuItems.filter(item => item.categoryId === cat.id && quotation.selezionati.has(item.id));
+      if (items.length === 0) return;
+      renderQueue.push({ type: 'cat', text: cat.nome });
+      items.forEach(item => {
+        renderQueue.push({ type: 'item', text: item.nome });
+        if (item.desc) renderQueue.push({ type: 'desc', text: item.desc });
+      });
+    });
+
+    // Tight (minimum) heights
+    const H_CAT_TIGHT = 6;
+    const H_ITEM_TIGHT = 4.5;
+    const H_DESC_TIGHT = 4;
+    const GAP_AFTER_CAT_TIGHT = 2;
+
+    let tightHeight = 0;
+    renderQueue.forEach((el, i) => {
+      if (el.type === 'cat') tightHeight += H_CAT_TIGHT;
+      else if (el.type === 'item') tightHeight += H_ITEM_TIGHT;
+      else tightHeight += H_DESC_TIGHT;
+      if ((el.type === 'item' || el.type === 'desc')) {
+        const next = renderQueue[i + 1];
+        if (next && next.type === 'cat') tightHeight += GAP_AFTER_CAT_TIGHT;
       }
     });
 
-    // Space calculation for menu centering/expansion
-    const bottomBlockReserve = 90; // estimated pixels for inclusions + notes + total + footer
-    const menuSpaceAvail = pageH - bottomBlockReserve - y;
-    let spacingFactor = 1.0;
-    const estMenuHeight = menuToRender.length * 6;
-    if (estMenuHeight < menuSpaceAvail && menuToRender.length > 0) {
-      spacingFactor = Math.min(menuSpaceAvail / estMenuHeight, 1.8);
+    // Compute scale factor:
+    // - If menu fits with room to spare: expand (max 2.2x)
+    // - If menu overflows: compress (min 0.75x) to fit
+    // - If still overflows even compressed: forced overflow allowed (rare)
+    const menuAvail = bottomBlockTop - y - 4;
+    let scale = 1;
+    if (renderQueue.length > 0 && tightHeight > 0) {
+      const ratio = menuAvail / tightHeight;
+      if (ratio >= 1) {
+        scale = Math.min(ratio, 2.2);
+      } else {
+        // Compress, but never below readability floor
+        scale = Math.max(ratio, 0.75);
+      }
     }
 
-    menuToRender.forEach((el) => {
-      if (y > pageH - 45) { // Basic overflow check
+    const H_CAT = H_CAT_TIGHT * scale;
+    const H_ITEM = H_ITEM_TIGHT * scale;
+    const H_DESC = H_DESC_TIGHT * scale;
+    const GAP_AFTER_CAT = GAP_AFTER_CAT_TIGHT * scale;
+
+    // Render menu with scaled spacing
+    renderQueue.forEach((el, i) => {
+      // Safety boundary: never let menu enter bottom block area
+      if (y > bottomBlockTop - 5) {
         doc.addPage();
         doc.setFillColor(...C_PAPER);
         doc.rect(0, 0, pageW, pageH, 'F');
-        y = 30;
+        y = margin + 5;
       }
 
       if (el.type === 'cat') {
-        y += 4 * spacingFactor;
         doc.setFont('times', 'italic');
-        doc.setFontSize(14);
+        doc.setFontSize(12);
         doc.setTextColor(...C_INK);
         doc.text(el.text, pageW / 2, y, { align: 'center' });
-        drawOrnament(pageW / 2, y + 2, 30, C_GOLD);
-        y += 8 * spacingFactor;
+        drawOrnament(pageW / 2, y + 2, 32, C_GOLD);
+        y += H_CAT;
       } else if (el.type === 'item') {
         doc.setFont('times', 'normal');
-        doc.setFontSize(10.5);
+        doc.setFontSize(10);
         doc.setTextColor(...C_INK);
-        doc.text(el.text, pageW / 2, y, { align: 'center' });
-        y += 6 * spacingFactor;
+        const lines = doc.splitTextToSize(el.text, pageW - 2 * margin - 10);
+        lines.forEach((line: string, li: number) => {
+          doc.text(line, pageW / 2, y, { align: 'center' });
+          if (li < lines.length - 1) y += 4.2;
+        });
+        y += H_ITEM;
       } else {
         doc.setFont('times', 'italic');
         doc.setFontSize(8.5);
         doc.setTextColor(...C_MUTED);
-        doc.text(el.text, pageW / 2, y - 2 * spacingFactor, { align: 'center' });
-        y += 2 * spacingFactor;
+        const lines = doc.splitTextToSize(el.text, pageW - 2 * margin - 20);
+        lines.forEach((line: string, li: number) => {
+          doc.text(line, pageW / 2, y, { align: 'center' });
+          if (li < lines.length - 1) y += 3.6;
+        });
+        y += H_DESC;
+      }
+
+      if ((el.type === 'item' || el.type === 'desc')) {
+        const next = renderQueue[i + 1];
+        if (next && next.type === 'cat') y += GAP_AFTER_CAT;
       }
     });
 
-    // ============================================
-    // BOTTOM BLOCKS (Anchored fixed positions)
-    // ============================================
-    y = pageH - 84;
+    // Bottom-anchored block: badges + notes + total
+    y = bottomBlockTop;
 
-    // Badges / Inclusions row
-    const inclArr = [];
-    if (quotation.inclusoBevande) inclArr.push('Bevande incluse');
-    if (quotation.inclusoTorta) inclArr.push('Torta inclusa');
-    if (quotation.inclusoProsecco) inclArr.push('Prosecco incluso');
-
-    if (inclArr.length > 0) {
-      const bW = 52;
-      const bH = 10;
-      const bGap = 6;
-      const totalBW = inclArr.length * bW + (inclArr.length - 1) * bGap;
-      let bx = (pageW - totalBW) / 2;
+    if (incl.length > 0) {
+      const badgeW = 48;
+      const badgeH = 8;
+      const gap = 5;
+      const totalW = incl.length * badgeW + (incl.length - 1) * gap;
+      let bx = (pageW - totalW) / 2;
       
-      inclArr.forEach(text => {
+      incl.forEach(text => {
         doc.setFillColor(...C_CREAM);
         doc.setDrawColor(...C_GOLD);
-        doc.setLineWidth(0.2);
-        doc.roundedRect(bx, y, bW, bH, 1, 1, 'FD');
-        doc.setFontSize(8.5);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(bx, y, badgeW, badgeH, 0.8, 0.8, 'FD');
         doc.setFont('times', 'italic');
+        doc.setFontSize(8.5);
         doc.setTextColor(...C_INK);
-        doc.text(text, bx + bW / 2, y + 6.3, { align: 'center' });
-        bx += bW + bGap;
+        doc.text(text, bx + badgeW / 2, y + 5.4, { align: 'center' });
+        bx += badgeW + gap;
       });
-      y += 18;
+      y += badgeH + 7;
     }
 
-    // Notes Section
-    if (quotation.note) {
+    if (noteLines.length > 0) {
+      y += 2;
       doc.setFont('times', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(...C_GOLD);
-      doc.text('NOTE E DETTAGLI', pageW / 2, y, { align: 'center', charSpace: 1.5 });
-      drawOrnament(pageW / 2, y + 3, 35, C_GOLD);
-      
-      y += 9;
-      doc.setFontSize(9.5);
-      doc.setTextColor(...C_MUTED);
-      const noteLines = doc.splitTextToSize(quotation.note, pageW - 2 * margin - 10);
-      doc.text(noteLines, pageW / 2, y, { align: 'center' });
+      doc.text('NOTE E DETTAGLI', pageW / 2, y, { align: 'center', charSpace: 2 });
+      drawOrnament(pageW / 2, y + 3, 30, C_GOLD);
+      y += 6;
+      doc.setFont('times', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(...C_INK);
+      noteLines.forEach((line: string) => {
+        doc.text(line, pageW / 2, y, { align: 'center' });
+        y += 4;
+      });
+      y += 2;
     }
 
-    // ============================================
-    // FINAL INVESTMENT SUMMARY
-    // ============================================
-    y = pageH - 45;
-    
-    // Double Border
+    // Grand total
+    const total = quotation.prezzoPersona * quotation.ospiti;
     doc.setDrawColor(...C_GOLD);
-    doc.setLineWidth(0.25);
+    doc.setLineWidth(0.4);
     doc.line(margin, y, pageW - margin, y);
+    doc.setLineWidth(0.15);
     doc.line(margin, y + 1.2, pageW - margin, y + 1.2);
+    y += 6;
     
-    y += 8;
     doc.setFont('times', 'italic');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(...C_GOLD);
-    doc.text('— il vostro investimento —', pageW / 2, y, { align: 'center', charSpace: 1.2 });
-    
+    doc.text('— il vostro investimento —', pageW / 2, y, { align: 'center', charSpace: 1.5 });
     y += 5;
-    doc.setFontSize(10);
-    doc.setTextColor(...C_MUTED);
-    const totalCalc = `${quotation.prezzoPersona.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}  ×  ${quotation.ospiti} ospiti`;
-    doc.text(totalCalc, pageW / 2, y, { align: 'center' });
-    
-    y += 12;
-    const totalVal = quotation.prezzoPersona * quotation.ospiti;
-    doc.setFont('times', 'bold');
-    doc.setFontSize(32);
-    doc.setTextColor(...C_DARK);
-    doc.text(totalVal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }), pageW / 2, y, { align: 'center' });
 
-    // ============================================
-    // SHARED FOOTER
-    // ============================================
-    const pCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pCount; i++) {
-        doc.setPage(i);
-        doc.setDrawColor(...C_GOLD);
-        doc.setLineWidth(0.15);
-        doc.line(margin, pageH - 15, pageW - margin, pageH - 15);
-        
-        doc.setFontSize(8);
-        doc.setFont('times', 'italic');
-        doc.setTextColor(...C_INK);
-        doc.text('Masseria Sacramento · C.da Sacramento, Palagianello (TA) · Cel. 328 1433143', pageW / 2, pageH - 10, { align: 'center' });
-        
-        doc.setFontSize(6.5);
-        doc.setTextColor(...C_MUTED);
-        const emission = `Emesso il ${new Date().toLocaleDateString('it-IT')}`;
-        doc.text(emission, pageW / 2, pageH - 5, { align: 'center' });
-        
-        if (pCount > 1) {
-            doc.text(`${i} / ${pCount}`, pageW - margin, pageH - 5, { align: 'right' });
-        }
+    doc.setFont('times', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...C_MUTED);
+    const breakdown = `${quotation.prezzoPersona.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}  ×  ${quotation.ospiti} ospiti`;
+    doc.text(breakdown, pageW / 2, y, { align: 'center' });
+    y += 7;
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(...C_DARK);
+    const totalStr = total.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+    doc.text(totalStr, pageW / 2, y + 5, { align: 'center' });
+
+    // Footer (no Locorotondo)
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(...C_GOLD);
+      doc.setLineWidth(0.2);
+      doc.line(margin, pageH - 16, pageW - margin, pageH - 16);
+      doc.setFont('times', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(...C_DARK);
+      doc.text('Masseria Sacramento  ·  C.da Sacramento, Palagianello (TA)  ·  Cel. 328 1433143', pageW / 2, pageH - 11, { align: 'center', charSpace: 0.3 });
+      doc.setFont('times', 'italic');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...C_MUTED);
+      const oggi = new Date().toLocaleDateString('it-IT');
+      if (pageCount > 1) {
+        doc.text(`Emesso il ${oggi}`, margin, pageH - 6);
+        doc.setFont('times', 'normal');
+        doc.text(`— ${i} / ${pageCount} —`, pageW / 2, pageH - 6, { align: 'center' });
+      } else {
+        doc.text(`Emesso il ${oggi}`, pageW / 2, pageH - 6, { align: 'center' });
+      }
     }
 
-    const safeFilename = (quotation.cliente || 'Cliente').replace(/\s+/g, '_').substring(0, 20);
-    doc.save(`Preventivo_Masseria_Sacramento_${safeFilename}.pdf`);
+    const safeName = (quotation.cliente || 'Cliente').replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+    doc.save(`Preventivo_Sacramento_${safeName}.pdf`);
   };
 
   return (
     <div className="min-h-screen bg-bg font-sans text-ink pb-12">
       <div className="max-w-[1100px] mx-auto px-6 pt-10">
         
-        {/* Editorial Header */}
         <header className="flex flex-col md:flex-row justify-between items-center md:items-end pb-8 border-b border-border mb-10 gap-6">
           <div className="brand text-center md:text-left flex flex-col items-center md:items-start">
             <div className="mb-4 w-32 h-32 flex items-center justify-center">
@@ -519,7 +567,6 @@ export default function App() {
                Agriturismo • Boutique Events
             </p>
             
-            {/* URL logo loader */}
             <div className="mt-4 w-full max-w-md">
               <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 flex items-center gap-1.5 mb-1.5">
                 <ImageIcon className="w-3 h-3" /> Logo da URL
@@ -560,7 +607,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Navigation Tabs */}
         <div className="flex bg-white/50 p-1.5 rounded-none border border-border mb-10 max-w-md mx-auto">
           <button
             onClick={() => setActiveTab('quotation')}
@@ -595,7 +641,6 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="grid grid-cols-1 lg:grid-cols-[280px_1fr_300px] gap-10 items-start"
             >
-              {/* Column 01: Event Data */}
               <section className="space-y-6">
                 <div>
                   <span className="editorial-label">01. Dati Evento</span>
@@ -661,7 +706,6 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Column 02: Menu Selection */}
               <section>
                 <span className="editorial-label">02. Selezione Menù</span>
                 <div className="max-h-[600px] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-border">
@@ -683,7 +727,7 @@ export default function App() {
                               <input 
                                 type="checkbox" 
                                 checked={quotation.selezionati.has(item.id)}
-                                onChange={() => {}} // Controlled by div click
+                                onChange={() => {}}
                                 className="w-4 h-4 accent-accent cursor-pointer rounded-none border-border"
                               />
                               <div className="flex-1">
@@ -704,7 +748,6 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Column 03: Summary */}
               <section>
                 <span className="editorial-label">03. Riepilogo</span>
                 <div className="bg-white border border-border p-6 shadow-sm">
@@ -770,7 +813,6 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="max-w-4xl mx-auto space-y-10 pb-20"
             >
-              {/* Menu Management Header */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white border border-border p-8 shadow-sm">
                 <div className="flex-1">
                   <h2 className="editorial-serif text-3xl text-ink mb-2">Configurazione Menù</h2>
@@ -809,13 +851,11 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Sections List */}
               <div className="space-y-12">
                 {categories.map((cat, idx) => {
                   const itemsInSection = menuItems.filter(i => i.categoryId === cat.id);
                   return (
                     <div key={cat.id} className="relative">
-                      {/* Section Counter */}
                       <div className="absolute -left-4 md:-left-8 top-0 text-[40px] font-bold opacity-[0.03] editorial-serif pointer-events-none">
                         {String(idx + 1).padStart(2, '0')}
                       </div>
@@ -843,7 +883,6 @@ export default function App() {
                           </button>
                         </div>
 
-                        {/* Add Item Form inside Section */}
                         <div className="mb-10 bg-accent/[0.02] border border-accent/10 p-6">
                           <h4 className="text-[10px] uppercase font-black tracking-[2px] mb-4 text-accent/60">Aggiungi Piatto a {cat.nome}</h4>
                           <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr_auto] gap-4 items-end">
@@ -882,7 +921,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Items List */}
                         <div className="space-y-0.5">
                           {itemsInSection.map(item => (
                             <div key={item.id} className="flex justify-between items-center py-4 border-b border-border/10 border-dashed hover:bg-black/[0.01] px-2 -mx-2 transition-colors group gap-4">

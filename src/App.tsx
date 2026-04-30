@@ -229,42 +229,38 @@ export default function App() {
     doc.setFillColor(...C_PAPER);
     doc.rect(0, 0, pageW, pageH, 'F');
 
-    // Header band
-    const headerH = 32;
+    // Header band — taller to accommodate larger logo
+    const headerH = 42;
     doc.setFillColor(...C_DARK);
     doc.rect(0, 0, pageW, headerH, 'F');
     doc.setDrawColor(...C_GOLD);
     doc.setLineWidth(0.3);
     doc.rect(6, 5, pageW - 12, headerH - 10, 'S');
 
-    // Logo left
+    // Logo left — bigger (26x26mm)
     try {
       const logoFmt = logo.startsWith('data:image/svg') ? 'SVG' 
                     : logo.startsWith('data:image/png') ? 'PNG' 
                     : 'JPEG';
-      doc.addImage(logo, logoFmt, 14, 8, 16, 16);
+      doc.addImage(logo, logoFmt, 12, 8, 26, 26);
     } catch (e) {
       doc.setDrawColor(...C_GOLD);
-      doc.circle(22, 16, 7, 'S');
+      doc.circle(25, 21, 12, 'S');
     }
 
-    // Brand right
+    // Brand right — vertically centered in taller band
     doc.setTextColor(...C_GOLD);
     doc.setFont('times', 'bold');
     doc.setFontSize(20);
-    doc.text('MASSERIA SACRAMENTO', pageW - 14, 18, { align: 'right', charSpace: 1.5 });
+    doc.text('MASSERIA SACRAMENTO', pageW - 14, 23, { align: 'right', charSpace: 1.5 });
     doc.setFont('times', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(...C_CREAM);
-    doc.text('agriturismo', pageW - 14, 24, { align: 'right', charSpace: 1.5 });
+    doc.text('agriturismo', pageW - 14, 30, { align: 'right', charSpace: 1.5 });
 
     // Client band - centered
-    let y = headerH + 8;
-    doc.setFont('times', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(...C_GOLD);
-    doc.text('— proposta evento —', pageW / 2, y, { align: 'center', charSpace: 1.5 });
-    y += 6;
+    // Client band — starts directly below header (no "proposta evento" label)
+    let y = headerH + 6;
 
     const clienteText = quotation.cliente || 'Gentile Cliente';
     const eventoText = quotation.evento ? `  ·  ${quotation.evento}` : '';
@@ -342,19 +338,14 @@ export default function App() {
     }
 
     const badgesH = incl.length > 0 ? 15 : 0;
-    const notesH = noteLines.length > 0 ? (10 + noteLines.length * 4) : 0;
+    const notesH = noteLines.length > 0 ? (6 + noteLines.length * 4) : 0;
     const totalH = 30;
     const footerReserveH = 18;
     const bottomBlockH = badgesH + notesH + totalH;
     const bottomBlockTop = pageH - footerReserveH - bottomBlockH;
 
-    // Menu intro
-    doc.setFont('times', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C_GOLD);
-    doc.text('PROPOSTA GASTRONOMICA', pageW / 2, y, { align: 'center', charSpace: 2.5 });
-    drawOrnament(pageW / 2, y + 3.5, 50, C_GOLD);
-    y += 8;
+    // Menu starts directly (no "PROPOSTA GASTRONOMICA" title)
+    y += 2;
 
     // Build render queue for auto-balancing
     type RenderItem = { type: 'cat' | 'item' | 'desc'; text: string };
@@ -478,13 +469,8 @@ export default function App() {
     }
 
     if (noteLines.length > 0) {
-      y += 2;
-      doc.setFont('times', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(...C_GOLD);
-      doc.text('NOTE E DETTAGLI', pageW / 2, y, { align: 'center', charSpace: 2 });
-      drawOrnament(pageW / 2, y + 3, 30, C_GOLD);
-      y += 6;
+      y += 4;
+      // Notes appear directly without title or ornament
       doc.setFont('times', 'italic');
       doc.setFontSize(9);
       doc.setTextColor(...C_INK);

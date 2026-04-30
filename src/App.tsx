@@ -237,26 +237,26 @@ export default function App() {
     doc.setLineWidth(0.3);
     doc.rect(6, 5, pageW - 12, headerH - 10, 'S');
 
-    // Logo left — bigger (26x26mm)
+    // Logo left — bigger (36x36mm)
     try {
       const logoFmt = logo.startsWith('data:image/svg') ? 'SVG' 
                     : logo.startsWith('data:image/png') ? 'PNG' 
                     : 'JPEG';
-      doc.addImage(logo, logoFmt, 12, 8, 26, 26);
+      doc.addImage(logo, logoFmt, 8, 3, 36, 36);
     } catch (e) {
       doc.setDrawColor(...C_GOLD);
-      doc.circle(25, 21, 12, 'S');
+      doc.circle(26, 21, 17, 'S');
     }
 
     // Brand right — vertically centered in taller band
     doc.setTextColor(...C_GOLD);
     doc.setFont('times', 'bold');
-    doc.setFontSize(20);
-    doc.text('MASSERIA SACRAMENTO', pageW - 14, 23, { align: 'right', charSpace: 1.5 });
+    doc.setFontSize(18);
+    doc.text('MASSERIA SACRAMENTO', pageW - 12, 23, { align: 'right' });
     doc.setFont('times', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(...C_CREAM);
-    doc.text('agriturismo', pageW - 14, 30, { align: 'right', charSpace: 1.5 });
+    doc.text('agriturismo', pageW - 12, 30, { align: 'right', charSpace: 1.2 });
 
     // Client band - centered
     // Client band — starts directly below header (no "proposta evento" label)
@@ -488,20 +488,15 @@ export default function App() {
     doc.line(margin, y, pageW - margin, y);
     doc.setLineWidth(0.15);
     doc.line(margin, y + 1.2, pageW - margin, y + 1.2);
-    y += 6;
-    
-    doc.setFont('times', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(...C_GOLD);
-    doc.text('— il vostro investimento —', pageW / 2, y, { align: 'center', charSpace: 1.5 });
-    y += 5;
+    y += 8;
 
+    // Breakdown line (no "il vostro investimento" label)
     doc.setFont('times', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...C_MUTED);
     const breakdown = `${quotation.prezzoPersona.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}  ×  ${quotation.ospiti} ospiti`;
     doc.text(breakdown, pageW / 2, y, { align: 'center' });
-    y += 7;
+    y += 8;
 
     doc.setFont('times', 'bold');
     doc.setFontSize(24);
